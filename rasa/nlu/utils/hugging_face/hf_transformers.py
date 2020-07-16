@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Text, Tuple, Optional
 from rasa.core.utils import get_dict_hash
 from rasa.nlu.model import Metadata
 from rasa.nlu.tokenizers.whitespace_tokenizer import WhitespaceTokenizer
+from rasa.nlu.tokenizers.jieba_tokenizer import JiebaTokenizer
 from rasa.nlu.components import Component
 from rasa.nlu.config import RasaNLUModelConfig
 from rasa.nlu.training_data import Message, TrainingData
@@ -42,13 +43,20 @@ class HFTransformersNLP(Component):
         # an optional path to a specific directory to download
         # and cache the pre-trained model weights.
         "cache_dir": None,
+        # an optional value to identify using semi-LM tokenizer instead of LM tokenizer [0|1]
+        "semi-lm": 0,
+        # an optional value to identify the dictonary path for jieba
+        "dictionary_path": None,
     }
 
     def __init__(self, component_config: Optional[Dict[Text, Any]] = None) -> None:
         super(HFTransformersNLP, self).__init__(component_config)
-
         self._load_model()
         self.whitespace_tokenizer = WhitespaceTokenizer()
+        self.jieba_tokenizer = None
+        if 'semi-lm' in component_config and component_config['semi-lm']==1:
+            self.jieba_tokenizer = JiebaTokenizer(component_config)
+            self.tokenizer.do_basic_tokenize = False
 
     def _load_model(self) -> None:
         """Try loading the model"""
@@ -224,9 +232,13 @@ class HFTransformersNLP(Component):
             List of token strings and token ids for the corresponding attribute of the
             message.
         """
-
+        if self.jieba_tokenizer is not None:
+            import jieba
+            ptext = ' '.join(list(jieba.cut(message.get(attribute))))
+            message.set(attribute, ptext)
+        print(message.get(attribute))
         tokens_in = self.whitespace_tokenizer.tokenize(message, attribute)
-
+        
         tokens_out = []
 
         token_ids_out = []
@@ -234,6 +246,8 @@ class HFTransformersNLP(Component):
         for token in tokens_in:
             # use lm specific tokenizer to further tokenize the text
             split_token_ids, split_token_strings = self._lm_tokenize(token.text)
+            print(split_token_strings)
+                
 
             split_token_ids, split_token_strings = self._lm_specific_token_cleanup(
                 split_token_ids, split_token_strings
