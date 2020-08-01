@@ -502,3 +502,7 @@ class HFTransformersNLP(Component):
             LANGUAGE_MODEL_DOCS[TEXT],
             self._get_docs_for_batch([message], attribute=TEXT)[0],
         )
+    
+    def persist(self, file_name: Text, model_dir: Text) -> Optional[Dict[Text, Any]]:
+        self.tokenizer.save_pretrained(model_dir)
+        self.model.save_pretrained(model_dir)
